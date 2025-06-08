@@ -43,10 +43,27 @@ const generateCPUData = (): CPUDevice[] => {
   });
 };
 
-export function CPUMonitoringTable() {
+interface CPUMonitoringTableProps {
+  cpuData?: any[];
+}
+
+export function CPUMonitoringTable({ cpuData: externalCpuData }: CPUMonitoringTableProps) {
   const [cpuData, setCPUData] = useState<CPUDevice[]>([]);
 
   useEffect(() => {
+    // If external data is provided, use it
+    if (externalCpuData && externalCpuData.length > 0) {
+      const formattedData = externalCpuData.map((cpu, index) => ({
+        id: `${cpu.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${index}`,
+        deviceName: cpu.name,
+        currentTemp: cpu.temperature,
+        maxTemp: cpu.maxTemp || (cpu.temperature + Math.random() * 5),
+        status: cpu.status,
+      }));
+      setCPUData(formattedData);
+      return;
+    }
+
     // Fetch real data from API
     const fetchCPUData = async () => {
       try {
@@ -90,7 +107,7 @@ export function CPUMonitoringTable() {
     }, 3000); // Update every 3 seconds
 
     return () => clearInterval(interval);
-  }, []);
+  }, [externalCpuData]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
