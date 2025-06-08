@@ -64,46 +64,11 @@ export function CPUMonitoringTable({ cpuData: externalCpuData }: CPUMonitoringTa
       return;
     }
 
-    // Fetch real data from API
-    const fetchCPUData = async () => {
-      try {
-        const response = await fetch('/api/temperature');
-        const data = await response.json();
-        
-        if (data.success && data.data.temperatures) {
-          const realCpuData = data.data.temperatures.map((temp: any, index: number) => {
-            const maxTemp = temp.value + Math.random() * 5; // Max temp is slightly higher than current
-            
-            let status = 'Normal';
-            if (temp.value > 75) status = 'Warning';
-            if (temp.value > 85) status = 'Critical';
-            if (temp.value < 50) status = 'Cool';
-
-            return {
-              id: `${temp.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${index}`,
-              deviceName: temp.name,
-              currentTemp: temp.value,
-              maxTemp: Math.round(maxTemp * 10) / 10,
-              status,
-            };
-          });
-          
-          setCPUData(realCpuData);
-        } else {
-          // Fallback to mock data
-          setCPUData(generateCPUData());
-        }
-      } catch (error) {
-        console.error('Failed to fetch CPU data:', error);
-        setCPUData(generateCPUData());
-      }
-    };
-
-    // Set initial data
-    fetchCPUData();
+    // Use mock data if no external data provided
+    setCPUData(generateCPUData());
     
     const interval = setInterval(() => {
-      fetchCPUData();
+      setCPUData(generateCPUData());
     }, 3000); // Update every 3 seconds
 
     return () => clearInterval(interval);

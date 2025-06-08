@@ -34,6 +34,7 @@ const generateIndividualCPUData = () => {
       id: cpu.toLowerCase().replace(/[^a-z0-9]/g, '-'),
       name: cpu,
       temperature: roundedTemp,
+      maxTemp: Math.round((roundedTemp + Math.random() * 5) * 10) / 10,
       cores,
       usage,
       status: roundedTemp > 80 ? 'Critical' : roundedTemp > 70 ? 'Warning' : 'Normal'
@@ -141,7 +142,7 @@ export default function CPUMonitoringPage() {
       // Calculate overall statistics
       const totalTemp = allTemperatureData.reduce((sum, temp) => sum + temp, 0);
       const avgTemp = Math.round((totalTemp / allTemperatureData.length) * 10) / 10;
-      const maxTemp = Math.max(...allTemperatureData);
+      const maxTemp = Math.round(Math.max(...allTemperatureData) * 10) / 10;
 
       // Update state
       setCpuData(processedCpuData);
@@ -207,7 +208,7 @@ Date,Time,UpTime,CPU,CPU Package,CPU IA Cores,CPU GT Cores,HDD1
   };
 
   useEffect(() => {
-    // Initialize with mock data
+    // Initialize with mock data only
     const initialData = generateIndividualCPUData();
     setCpuData(initialData);
     
@@ -221,46 +222,6 @@ Date,Time,UpTime,CPU,CPU Package,CPU IA Cores,CPU GT Cores,HDD1
       maxTemp: Math.round(maxTemp * 10) / 10,
       dataSource: 'Mock Data'
     });
-
-    // Try to fetch real data from API (your existing logic)
-    const fetchTemperatureData = async () => {
-      try {
-        const response = await fetch('/api/temperature');
-        const data = await response.json();
-        
-        if (data.success && data.data.temperatures) {
-          const realCpuData = data.data.temperatures.map((temp: any, index: number) => ({
-            id: temp.name.toLowerCase().replace(/[^a-z0-9]/g, '-'),
-            name: temp.name,
-            temperature: temp.value,
-            cores: temp.name.includes('Package') ? 8 : temp.name.includes('IA') ? 4 : temp.name.includes('GT') ? 4 : temp.name.includes('HDD') ? 0 : 1,
-            usage: temp.name.includes('HDD') ? 0 : Math.floor(Math.random() * 100),
-            status: temp.value > 80 ? 'Critical' : temp.value > 70 ? 'Warning' : 'Normal'
-          }));
-          
-          setCpuData(realCpuData);
-          setIsConnected(data.connected);
-          
-          // Calculate metrics from real data
-          const tempValues = data.data.temperatures.map((t: any) => t.value);
-          const avgTemp = tempValues.reduce((sum: number, t: number) => sum + t, 0) / tempValues.length;
-          const maxTemp = Math.max(...tempValues);
-          
-          setMetrics({
-            totalCPUs: 5, // Fixed value as requested
-            avgTemp: Math.round(avgTemp * 10) / 10,
-            maxTemp: Math.round(maxTemp * 10) / 10,
-            dataSource: data.dataSource
-          });
-        }
-      } catch (error) {
-        console.error('Failed to fetch temperature data:', error);
-      }
-    };
-
-    fetchTemperatureData();
-    const interval = setInterval(fetchTemperatureData, 5000);
-    return () => clearInterval(interval);
   }, []);
 
   const getStatusColor = (status: string) => {
@@ -289,7 +250,7 @@ Date,Time,UpTime,CPU,CPU Package,CPU IA Cores,CPU GT Cores,HDD1
             <div className="mb-8">
               <h1 className="text-3xl font-bold tracking-tight">CPU Monitoring</h1>
               <p className="text-muted-foreground mt-2">
-                Real-time monitoring of individual CPU performance and temperature via AIDA64 CSV Logging
+                Real-time monitoring of individual CPU performance and temperature via AIDA64 CSV Upload
               </p>
               <div className="mt-2 flex items-center gap-2">
                 <Badge variant={isConnected ? "default" : "secondary"}>
@@ -368,8 +329,8 @@ Date,Time,UpTime,CPU,CPU Package,CPU IA Cores,CPU GT Cores,HDD1
               
               <MetricCard
                 title="Data Source"
-                value={isConnected ? "Live" : "Static"}
-                status={isConnected ? "Connected" : "Offline"}
+                value={isConnected ? "CSV Data" : "Mock Data"}
+                status={isConnected ? "Uploaded" : "Default"}
                 statusColor={isConnected ? "green" : "red"}
                 icon={Database}
                 iconColor={isConnected ? "green" : "red"}
