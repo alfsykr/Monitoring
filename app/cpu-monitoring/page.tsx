@@ -16,7 +16,8 @@ import {
   Activity,
   Database,
   Upload,
-  FileText
+  FileText,
+  RefreshCw
 } from 'lucide-react';
 
 // Generate individual CPU data based on AIDA64 configuration
@@ -52,6 +53,9 @@ export default function CPUMonitoringPage() {
   });
   const [isConnected, setIsConnected] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [uploadedCsvContent, setUploadedCsvContent] = useState<string | null>(null);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
   // AIDA64 CSV Parser Function
   const processAidaData = (csvContent: string) => {
@@ -153,6 +157,7 @@ export default function CPUMonitoringPage() {
         dataSource: 'AIDA64 CSV'
       });
       setIsConnected(true);
+      setLastUpdate(new Date());
 
     } catch (error) {
       console.error('Error processing data:', error);
@@ -176,13 +181,84 @@ export default function CPUMonitoringPage() {
     }
   };
 
+  // Simulate data variation for uploaded CSV (to show monitoring changes)
+  const simulateDataVariation = (csvContent: string) => {
+    try {
+      const result = Papa.parse(csvContent, {
+        header: false,
+        skipEmptyLines: true,
+        dynamicTyping: true
+      });
+
+      const rows = result.data;
+      let headerIndex = -1;
+      
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i] as any[];
+        if (row && row.length > 0 && typeof row[0] === 'string') {
+          if (row[0].includes('Date') || row.join(',').includes('Date,Time,UpTime,CPU')) {
+            headerIndex = i;
+            break;
+          }
+        }
+      }
+
+      if (headerIndex === -1) return;
+
+      const headers = rows[headerIndex] as string[];
+      const tempColumns = headers.slice(3);
+
+      // Create simulated data with slight variations
+      const sensorData: any[] = [];
+      
+      tempColumns.forEach((sensorName) => {
+        // Get base temperature from original data or use default
+        const baseTemp = sensorName.includes('HDD') ? 35 : sensorName.includes('CPU') ? 50 : 45;
+        // Add realistic variation (±3°C)
+        const variation = (Math.random() - 0.5) * 6;
+        const currentTemp = Math.max(25, baseTemp + variation);
+        const roundedTemp = Math.round(currentTemp * 10) / 10;
+        
+        sensorData.push({
+          id: sensorName.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+          name: sensorName,
+          temperature: roundedTemp,
+          maxTemp: Math.round((roundedTemp + Math.random() * 3) * 10) / 10,
+          cores: sensorName.includes('Package') ? 8 : sensorName.includes('IA') ? 4 : sensorName.includes('GT') ? 4 : sensorName.includes('HDD') ? 0 : 1,
+          usage: sensorName.includes('HDD') ? 0 : Math.floor(Math.random() * 100),
+          status: roundedTemp > 80 ? 'Critical' : roundedTemp > 70 ? 'Warning' : 'Normal'
+        });
+      });
+
+      // Calculate metrics
+      const tempValues = sensorData.map(sensor => sensor.temperature);
+      const avgTemp = tempValues.reduce((sum, t) => sum + t, 0) / tempValues.length;
+      const maxTemp = Math.max(...tempValues);
+
+      setCpuData(sensorData);
+      setMetrics({
+        totalCPUs: 5,
+        avgTemp: Math.round(avgTemp * 10) / 10,
+        maxTemp: Math.round(maxTemp * 10) / 10,
+        dataSource: 'AIDA64 CSV (Live)'
+      });
+      setLastUpdate(new Date());
+
+    } catch (error) {
+      console.error('Error simulating data variation:', error);
+    }
+  };
+
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
     reader.onload = (e) => {
-      processAidaData(e.target?.result as string);
+      const csvContent = e.target?.result as string;
+      setUploadedCsvContent(csvContent);
+      processAidaData(csvContent);
+      setAutoRefresh(true); // Enable auto-refresh when file is uploaded
     };
     reader.readAsText(file);
   };
@@ -204,7 +280,13 @@ Date,Time,UpTime,CPU,CPU Package,CPU IA Cores,CPU GT Cores,HDD1
 6/5/2025,4:36:42 PM,05:04:48,58,52,52,49,37
 6/5/2025,4:36:43 PM,05:04:49,61,54,54,51,37`;
     
+    setUploadedCsvContent(sampleData);
     processAidaData(sampleData);
+    setAutoRefresh(true); // Enable auto-refresh when sample data is used
+  };
+
+  const toggleAutoRefresh = () => {
+    setAutoRefresh(!autoRefresh);
   };
 
   useEffect(() => {
@@ -224,6 +306,17 @@ Date,Time,UpTime,CPU,CPU Package,CPU IA Cores,CPU GT Cores,HDD1
     });
   }, []);
 
+  // Auto-refresh effect
+  useEffect(() => {
+    if (!autoRefresh || !uploadedCsvContent) return;
+
+    const interval = setInterval(() => {
+      simulateDataVariation(uploadedCsvContent);
+    }, 5000); // Update every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [autoRefresh, uploadedCsvContent]);
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Normal':
@@ -235,6 +328,14 @@ Date,Time,UpTime,CPU,CPU Package,CPU IA Cores,CPU GT Cores,HDD1
       default:
         return 'bg-gray-500/10 text-gray-500 border-gray-500/20';
     }
+  };
+
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('id-ID', { 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      second: '2-digit' 
+    });
   };
 
   return (
@@ -256,6 +357,16 @@ Date,Time,UpTime,CPU,CPU Package,CPU IA Cores,CPU GT Cores,HDD1
                 <Badge variant={isConnected ? "default" : "secondary"}>
                   {metrics.dataSource}
                 </Badge>
+                {autoRefresh && (
+                  <Badge variant="default" className="bg-green-500/10 text-green-500 border-green-500/20">
+                    Auto-Refresh Active
+                  </Badge>
+                )}
+                {uploadedCsvContent && (
+                  <span className="text-sm text-muted-foreground">
+                    Last Update: {formatTime(lastUpdate)}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -267,7 +378,7 @@ Date,Time,UpTime,CPU,CPU Package,CPU IA Cores,CPU GT Cores,HDD1
                   Upload AIDA64 CSV File
                 </h2>
                 
-                <div className="flex gap-4 items-center">
+                <div className="flex gap-4 items-center flex-wrap">
                   <label className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg cursor-pointer transition-colors">
                     <FileText className="w-4 h-4" />
                     Choose CSV File
@@ -286,6 +397,17 @@ Date,Time,UpTime,CPU,CPU Package,CPU IA Cores,CPU GT Cores,HDD1
                   >
                     Use Sample Data
                   </Button>
+
+                  {uploadedCsvContent && (
+                    <Button
+                      onClick={toggleAutoRefresh}
+                      variant={autoRefresh ? "default" : "outline"}
+                      className="flex items-center gap-2"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${autoRefresh ? 'animate-spin' : ''}`} />
+                      {autoRefresh ? 'Stop Auto-Refresh' : 'Start Auto-Refresh'}
+                    </Button>
+                  )}
                   
                   {isProcessing && (
                     <span className="text-blue-600 font-medium">Processing...</span>
@@ -294,6 +416,7 @@ Date,Time,UpTime,CPU,CPU Package,CPU IA Cores,CPU GT Cores,HDD1
                 
                 <p className="text-sm text-muted-foreground mt-2">
                   Upload your AIDA64 CSV log file to get real temperature data, or use sample data for testing.
+                  {uploadedCsvContent && " Auto-refresh will simulate live monitoring with data variations every 5 seconds."}
                 </p>
               </CardContent>
             </Card>
