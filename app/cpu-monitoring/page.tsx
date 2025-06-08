@@ -40,9 +40,9 @@ const generateIndividualCPUData = () => {
 export default function CPUMonitoringPage() {
   const [cpuData, setCpuData] = useState<any[]>([]);
   const [metrics, setMetrics] = useState({
-    totalCPUs: 5,
-    avgTemp: 72.5,
-    maxTemp: 85.2,
+    totalCPUs: 5, // Fixed value as requested
+    avgTemp: 0,
+    maxTemp: 0,
     dataSource: 'Mock Data'
   });
   const [isConnected, setIsConnected] = useState(false);
@@ -71,20 +71,49 @@ export default function CPUMonitoringPage() {
           setCpuData(realCpuData);
           setIsConnected(data.connected);
           
-          // Update metrics
-          const avgTemp = data.data.summary.avgTemp;
-          const maxTemp = data.data.summary.maxTemp;
+          // Calculate metrics from real data
+          const tempValues = data.data.temperatures.map((t: any) => t.value);
+          const avgTemp = tempValues.reduce((sum: number, t: number) => sum + t, 0) / tempValues.length;
+          const maxTemp = Math.max(...tempValues);
           
           setMetrics({
-            totalCPUs: realCpuData.length,
+            totalCPUs: 5, // Fixed value as requested
             avgTemp: Math.round(avgTemp * 10) / 10,
             maxTemp: Math.round(maxTemp * 10) / 10,
             dataSource: data.dataSource
           });
+        } else {
+          // Use mock data but calculate proper metrics
+          const mockData = generateIndividualCPUData();
+          setCpuData(mockData);
+          
+          const tempValues = mockData.map(cpu => cpu.temperature);
+          const avgTemp = tempValues.reduce((sum, t) => sum + t, 0) / tempValues.length;
+          const maxTemp = Math.max(...tempValues);
+          
+          setMetrics({
+            totalCPUs: 5,
+            avgTemp: Math.round(avgTemp * 10) / 10,
+            maxTemp: Math.round(maxTemp * 10) / 10,
+            dataSource: 'Mock Data'
+          });
         }
       } catch (error) {
         console.error('Failed to fetch temperature data:', error);
-        // Keep using mock data
+        // Keep using mock data with proper calculations
+        const mockData = generateIndividualCPUData();
+        setCpuData(mockData);
+        
+        const tempValues = mockData.map(cpu => cpu.temperature);
+        const avgTemp = tempValues.reduce((sum, t) => sum + t, 0) / tempValues.length;
+        const maxTemp = Math.max(...tempValues);
+        
+        setMetrics({
+          totalCPUs: 5,
+          avgTemp: Math.round(avgTemp * 10) / 10,
+          maxTemp: Math.round(maxTemp * 10) / 10,
+          dataSource: 'Mock Data'
+        });
       }
     };
 
@@ -155,7 +184,7 @@ export default function CPUMonitoringPage() {
               <MetricCard
                 title="Max Temperature"
                 value={`${metrics.maxTemp}°C`}
-                status="Warning"
+                status="Current"
                 statusColor="red"
                 icon={Activity}
                 iconColor="red"

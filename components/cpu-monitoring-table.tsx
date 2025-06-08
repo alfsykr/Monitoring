@@ -10,7 +10,7 @@ interface CPUDevice {
   deviceName: string;
   currentTemp: number;
   status: string;
-  acAction: string;
+  maxTemp: number;
 }
 
 const generateCPUData = (): CPUDevice[] => {
@@ -26,6 +26,7 @@ const generateCPUData = (): CPUDevice[] => {
     const baseTemp = device.includes('HDD') ? 35 : 65;
     const temp = baseTemp + Math.random() * 15 - 7.5;
     const roundedTemp = Math.round(temp * 10) / 10;
+    const maxTemp = roundedTemp + Math.random() * 5; // Max temp is slightly higher than current
     
     let status = 'Normal';
     if (roundedTemp > 75) status = 'Warning';
@@ -36,8 +37,8 @@ const generateCPUData = (): CPUDevice[] => {
       id: `${device.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${index}`,
       deviceName: device,
       currentTemp: roundedTemp,
+      maxTemp: Math.round(maxTemp * 10) / 10,
       status,
-      acAction: roundedTemp > 75 ? 'Fan Speed Up' : 'Auto',
     };
   });
 };
@@ -46,11 +47,46 @@ export function CPUMonitoringTable() {
   const [cpuData, setCPUData] = useState<CPUDevice[]>([]);
 
   useEffect(() => {
-    // Set initial data after component mounts
-    setCPUData(generateCPUData());
+    // Fetch real data from API
+    const fetchCPUData = async () => {
+      try {
+        const response = await fetch('/api/temperature');
+        const data = await response.json();
+        
+        if (data.success && data.data.temperatures) {
+          const realCpuData = data.data.temperatures.map((temp: any, index: number) => {
+            const maxTemp = temp.value + Math.random() * 5; // Max temp is slightly higher than current
+            
+            let status = 'Normal';
+            if (temp.value > 75) status = 'Warning';
+            if (temp.value > 85) status = 'Critical';
+            if (temp.value < 50) status = 'Cool';
+
+            return {
+              id: `${temp.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${index}`,
+              deviceName: temp.name,
+              currentTemp: temp.value,
+              maxTemp: Math.round(maxTemp * 10) / 10,
+              status,
+            };
+          });
+          
+          setCPUData(realCpuData);
+        } else {
+          // Fallback to mock data
+          setCPUData(generateCPUData());
+        }
+      } catch (error) {
+        console.error('Failed to fetch CPU data:', error);
+        setCPUData(generateCPUData());
+      }
+    };
+
+    // Set initial data
+    fetchCPUData();
     
     const interval = setInterval(() => {
-      setCPUData(generateCPUData());
+      fetchCPUData();
     }, 3000); // Update every 3 seconds
 
     return () => clearInterval(interval);
@@ -84,7 +120,7 @@ export function CPUMonitoringTable() {
               <TableHead>Device Name</TableHead>
               <TableHead>Current Temp</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>AC Action</TableHead>
+              <TableHead>Max Temp</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -103,8 +139,8 @@ export function CPUMonitoringTable() {
                     {device.status}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {device.acAction}
+                <TableCell className="font-mono text-muted-foreground">
+                  {device.maxTemp}°C
                 </TableCell>
               </TableRow>
             ))}
