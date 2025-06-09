@@ -79,7 +79,7 @@ export default function HomePage() {
               <MetricCard
                 title="CPU yang Dimonitor"
                 value={localMetrics.cpuCount}
-                status={isConnected ? "AIDA64" : }
+                status={isConnected ? "AIDA64" : "Mock Data"}
                 statusColor="blue"
                 icon={Cpu}
                 iconColor="blue"
