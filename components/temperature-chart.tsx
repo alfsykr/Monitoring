@@ -3,57 +3,27 @@
 import { useState, useEffect } from 'react';
 import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-
-// Mock data generator for 24-hour temperature
-const generateTemperatureData = () => {
-  const data = [];
-  const now = new Date();
-  
-  for (let i = 23; i >= 0; i--) {
-    const time = new Date(now.getTime() - i * 60 * 60 * 1000);
-    const hour = time.getHours().toString().padStart(2, '0') + ':00';
-    
-    // Generate realistic CPU temperature data (45-85°C)
-    const baseTemp = 65;
-    const variation = Math.sin((i / 24) * 2 * Math.PI) * 10 + Math.random() * 8 - 4;
-    const cpuTemp = Math.max(45, Math.min(85, baseTemp + variation));
-    
-    // Generate room temperature data (20-30°C)
-    const roomTemp = 24 + Math.sin((i / 24) * 2 * Math.PI) * 3 + Math.random() * 2 - 1;
-    
-    data.push({
-      time: hour,
-      cpu: Math.round(cpuTemp * 10) / 10,
-      room: Math.round(roomTemp * 10) / 10,
-    });
-  }
-  
-  return data;
-};
+import { useAIDA64 } from '@/lib/aida64-context';
 
 export function TemperatureChart() {
-  const [data, setData] = useState<any[]>([]);
-
-  useEffect(() => {
-    // Set initial data after component mounts
-    setData(generateTemperatureData());
-    
-    const interval = setInterval(() => {
-      setData(generateTemperatureData());
-    }, 5000); // Update every 5 seconds
-
-    return () => clearInterval(interval);
-  }, []);
+  const { chartData, isConnected } = useAIDA64();
 
   return (
     <Card className="col-span-1 lg:col-span-2 border-0 bg-card/50 backdrop-blur-sm">
       <CardHeader>
-        <CardTitle className="text-lg font-semibold">24-Hour Temperature Graph</CardTitle>
+        <CardTitle className="text-lg font-semibold flex items-center justify-between">
+          24-Hour Temperature Graph
+          {isConnected && (
+            <span className="text-sm text-green-600 font-normal">
+              🟢 AIDA64 Data
+            </span>
+          )}
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+            <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="cpuGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.8}/>

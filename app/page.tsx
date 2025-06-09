@@ -8,6 +8,7 @@ import { TemperatureChart } from '@/components/temperature-chart';
 import { TemperatureScale } from '@/components/temperature-scale';
 import { CPUMonitoringTable } from '@/components/cpu-monitoring-table';
 import { Footer } from '@/components/footer';
+import { useAIDA64 } from '@/lib/aida64-context';
 import { 
   Cpu, 
   Thermometer, 
@@ -16,21 +17,35 @@ import {
 } from 'lucide-react';
 
 export default function HomePage() {
-  const [metrics, setMetrics] = useState({
+  const { cpuData, metrics, isConnected } = useAIDA64();
+  const [localMetrics, setLocalMetrics] = useState({
     cpuCount: 7,
     roomTemp: 24.5,
     totalComputers: 1,
     maxCpuTemp: 78.2,
   });
 
-  // Simulate real-time data updates
+  // Update local metrics based on AIDA64 data
+  useEffect(() => {
+    if (cpuData.length > 0) {
+      // Get CPU temperatures (exclude HDD)
+      const cpuTemps = cpuData.filter(cpu => !cpu.name.includes('HDD')).map(cpu => cpu.temperature);
+      const maxCpuTemp = Math.max(...cpuTemps);
+      
+      setLocalMetrics(prev => ({
+        ...prev,
+        cpuCount: cpuData.length,
+        maxCpuTemp: maxCpuTemp,
+      }));
+    }
+  }, [cpuData]);
+
+  // Simulate room temperature variation
   useEffect(() => {
     const interval = setInterval(() => {
-      setMetrics(prev => ({
-        cpuCount: prev.cpuCount,
-        roomTemp: 24.5 + (Math.random() - 0.5) * 2, // Room temp with slight variation
-        totalComputers: prev.totalComputers,
-        maxCpuTemp: 75 + Math.random() * 10, // CPU temp between 75-85°C
+      setLocalMetrics(prev => ({
+        ...prev,
+        roomTemp: 24.5 + (Math.random() - 0.5) * 2,
       }));
     }, 5000);
 
@@ -52,14 +67,19 @@ export default function HomePage() {
               <p className="text-muted-foreground mt-2">
                 Real-time monitoring dashboard for CPU temperature and room environment
               </p>
+              {isConnected && (
+                <p className="text-sm text-green-600 mt-1">
+                  🟢 Connected to AIDA64 data source
+                </p>
+              )}
             </div>
 
             {/* Metrics Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               <MetricCard
                 title="CPU yang Dimonitor"
-                value={metrics.cpuCount}
-                status="PRTG"
+                value={localMetrics.cpuCount}
+                status={isConnected ? "AIDA64" : "PRTG"}
                 statusColor="blue"
                 icon={Cpu}
                 iconColor="blue"
@@ -67,7 +87,7 @@ export default function HomePage() {
               
               <MetricCard
                 title="Suhu Ruangan Lab"
-                value={`${metrics.roomTemp.toFixed(1)}°C`}
+                value={`${localMetrics.roomTemp.toFixed(1)}°C`}
                 status="Normal"
                 statusColor="orange"
                 icon={Thermometer}
@@ -76,7 +96,7 @@ export default function HomePage() {
               
               <MetricCard
                 title="Total Komputer"
-                value={metrics.totalComputers}
+                value={localMetrics.totalComputers}
                 status="Aktif"
                 statusColor="green"
                 icon={Monitor}
@@ -85,8 +105,8 @@ export default function HomePage() {
               
               <MetricCard
                 title="Suhu Tertinggi CPU"
-                value={`${metrics.maxCpuTemp.toFixed(1)}°C`}
-                status="CPU-03"
+                value={`${localMetrics.maxCpuTemp.toFixed(1)}°C`}
+                status={isConnected ? "AIDA64" : "CPU-03"}
                 statusColor="red"
                 icon={AlertTriangle}
                 iconColor="red"
@@ -101,7 +121,7 @@ export default function HomePage() {
 
             {/* CPU Monitoring Table */}
             <div className="grid grid-cols-1 gap-6">
-              <CPUMonitoringTable />
+              <CPUMonitoringTable cpuData={cpuData} />
             </div>
 
             {/* Footer */}
